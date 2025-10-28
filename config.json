@@ -1,0 +1,8 @@
+{
+    "audio_folder": "audio",
+    "report_folder": "reports",
+    "reference_dialogs_folder": "etalons",
+    "whisper_model": "medium",
+    "supported_languages": ["en", "es", "it", "de", "pl", "ru"],
+    "use_cuda": true
+}

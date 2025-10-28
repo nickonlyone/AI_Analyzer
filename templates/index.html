@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialog Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .upload-section { margin: 20px 0; padding: 20px; border: 2px dashed #ccc; }
+        .results-section { margin-top: 30px; }
+        .task-status { padding: 10px; margin: 5px 0; border-left: 4px solid #007bff; }
+        .completed { border-color: #28a745; }
+        .error { border-color: #dc3545; }
+        .processing { border-color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔊 Dialog Analyzer</h1>
+
+        <div class="upload-section">
+            <h3>Загрузите аудио файлы для анализа</h3>
+            <input type="file" id="fileInput" multiple accept="audio/*">
+            <button onclick="uploadFiles()">Анализировать</button>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <div class="results-section">
+            <h3>Результаты анализа</h3>
+            <button onclick="downloadReport()">📊 Скачать отчет Excel</button>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('uploadStatus');
+
+            if (!fileInput.files.length) {
+                statusDiv.innerHTML = '<p style="color: red;">Выберите файлы</p>';
+                return;
+            }
+
+            const formData = new FormData();
+            for (let file of fileInput.files) {
+                formData.append('files', file);
+            }
+
+            try {
+                statusDiv.innerHTML = '<p>Загрузка...</p>';
+                const response = await fetch('/analyze-batch', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                statusDiv.innerHTML = `<p style="color: green;">${result.message}</p>`;
+
+                // Начинаем отслеживание статуса
+                monitorTasks(result.task_ids);
+
+            } catch (error) {
+                statusDiv.innerHTML = `<p style="color: red;">Ошибка: ${error}</p>`;
+            }
+        }
+
+        async function monitorTasks(taskIds) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h4>Статус задач:</h4>';
+
+            for (let taskId of taskIds) {
+                const taskDiv = document.createElement('div');
+                taskDiv.id = `task-${taskId}`;
+                taskDiv.className = 'task-status';
+                resultsDiv.appendChild(taskDiv);
+
+                // Периодически проверяем статус
+                const interval = setInterval(async () => {
+                    try {
+                        const response = await fetch(`/status/${taskId}`);
+                        const status = await response.json();
+
+                        const taskElement = document.getElementById(`task-${taskId}`);
+                        taskElement.innerHTML = `
+                            <strong>${status.filename}</strong> -
+                            Статус: ${status.status} -
+                            Прогресс: ${status.progress || 0}%
+                            ${status.error ? `<br>Ошибка: ${status.error}` : ''}
+                        `;
+
+                        taskElement.className = `task-status ${status.status}`;
+
+                        if (status.status === 'completed' || status.status === 'error') {
+                            clearInterval(interval);
+                        }
+                    } catch (error) {
+                        console.error('Ошибка проверки статуса:', error);
+                    }
+                }, 2000);
+            }
+        }
+
+        async function downloadReport() {
+            try {
+                const response = await fetch('/download-report');
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'dialogs_analysis_summary.xlsx';
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert('Отчет пока недоступен');
+                }
+            } catch (error) {
+                alert('Ошибка скачивания отчета: ' + error);
+            }
+        }
+    </script>
+</body>
+</html>

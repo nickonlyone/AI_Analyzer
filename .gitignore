@@ -1,0 +1,7 @@
+venv/
+.venv/
+env/
+venv*/
+ffmpeg-master-latest-win64-gpl-shared/
+__pycache__/
+.idea/
